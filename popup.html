@@ -1,77 +1,88 @@
-<!-- <html>
-  <body>
-    <h1>WebStyler</h1>
-  </body>
-</html> -->
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Webstyler Extension</title>
-    <link rel="stylesheet" href="styles.css">
-    <script src='popup.js' defer></script>
+  <meta charset="utf-8" />
+  <title>WebStyler</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-    <div class="tab">
-        <button class="tablinks" id="generalTab">General</button>
-        <button class="tablinks" id="colorblindTab">Colorblind</button>
+  <!-- Tab navigation -->
+  <div class="tabs">
+    <button id="generalTab" class="tablinks active">General</button>
+    <button id="colorblindTab" class="tablinks">Colorblind</button>
+  </div>
+
+  <!-- General settings -->
+  <div id="General" class="tabcontent" style="display: block;">
+    <!-- ── New Profile Section ───────────────────────────────────── -->
+    <div class="profile-section">
+      <label for="profile-select">Profile:</label>
+      <select id="profile-select">
+        <option value="" disabled selected>Select profile</option>
+      </select>
+      <button id="save-profile-btn">Save Profile</button>
+    </div>
+    <!-- ──────────────────────────────────────────────────────────── -->
+
+    <!-- Text size control -->
+    <div class="control">
+      <input type="checkbox" id="enable-size" />
+      <label for="size-slider">Text Size</label>
+      <input type="range" id="size-slider" min="1" max="100" value="50" />
     </div>
 
-    <div id="General" class="tabcontent">
-        <div class="feature-container">
-            <input type="checkbox" id="enable-size" checked>
-            <label for="size-slider">Size:</label>
-            <input type="range" id="size-slider" min="1" max="100">
-        </div>
-        <!-- <div class="feature-container">
-            <input type="checkbox" id="enable-spacing" checked>
-            <label for="spacing-slider">Spacing:</label>
-            <input type="range" id="spacing-slider" min="0" max="100">
-        </div> -->
-        <div class="feature-container">
-            <input type="checkbox" id="enable-font" checked>
-            <label for="font-select">Font:</label>
-            <select id="font-select">
-                <option value="Arial">Arial</option>
-                <option value="Verdana">Verdana</option>
-                <option value="Helvetica">Helvetica</option>
-                <option value="Times New Roman">Times New Roman</option>
-                <option value="Courier New">Courier New</option>
-            </select>
-        </div>
-        <div class="feature-container">
-            <input type="checkbox" id="enable-color" checked>
-            <label for="color-wheel">Color:</label>
-            <input type="color" id="color-wheel">
-        </div>
-        <div class="feature-container">
-            <input type="checkbox" id="enable-bg-color" checked>
-            <label for="bg-color-wheel">BG Color:</label>
-            <input type="color" id="bg-color-wheel">
-        </div>
-        <div class="buttons-container">
-            <button id="apply-btn">Apply</button>
-            <button id="reset-btn">Reset</button>
-        </div>
+    <!-- Font family control -->
+    <div class="control">
+      <input type="checkbox" id="enable-font" />
+      <label for="font-select">Font</label>
+      <select id="font-select">
+        <option value="Arial">Arial</option>
+        <option value="Times New Roman">Times New Roman</option>
+        <option value="Helvetica">Helvetica</option>
+        <option value="Courier New">Courier New</option>
+      </select>
     </div>
 
-    <div id="Colorblind" class="tabcontent">
-        <div class="feature-container">
-            <input type="checkbox" id="protanopia">
-            <label for="protanopia">Protanopia</label>
-        </div>
-        <div class="feature-container">
-            <input type="checkbox" id="deuteranopia">
-            <label for="deuteranopia">Deuteranopia</label>
-        </div>
-        <div class="feature-container">
-            <input type="checkbox" id="tritanopia">
-            <label for="tritanopia">Tritanopia</label>
-        </div>
-        <div class="buttons-container">
-            <button id="colorblind-apply-btn">Apply</button>
-            <button id="colorblind-reset-btn">Reset</button>
-        </div>
+    <!-- Text color control -->
+    <div class="control">
+      <input type="checkbox" id="enable-color" />
+      <label for="color-wheel">Text Color</label>
+      <input type="color" id="color-wheel" value="#000000" />
     </div>
+
+    <!-- Background color control -->
+    <div class="control">
+      <input type="checkbox" id="enable-bg-color" />
+      <label for="bg-color-wheel">Background Color</label>
+      <input type="color" id="bg-color-wheel" value="#ffffff" />
+    </div>
+
+    <!-- Apply / Reset -->
+    <button id="apply-btn">Apply</button>
+    <button id="reset-btn">Reset</button>
+  </div>
+
+  <!-- Colorblind settings -->
+  <div id="Colorblind" class="tabcontent">
+    <div class="control">
+      <input type="radio" id="protanopia" name="colorblind" />
+      <label for="protanopia">Protanopia</label>
+    </div>
+    <div class="control">
+      <input type="radio" id="deuteranopia" name="colorblind" />
+      <label for="deuteranopia">Deuteranopia</label>
+    </div>
+    <div class="control">
+      <input type="radio" id="tritanopia" name="colorblind" />
+      <label for="tritanopia">Tritanopia</label>
+    </div>
+    <button id="colorblind-apply-btn">Apply</button>
+    <button id="colorblind-reset-btn">Reset</button>
+  </div>
+  <script src="profileManager.js"></script>
+  <script src="popup.js"></script>
+
+
+  <script src="popup.js"></script>
 </body>
 </html>
