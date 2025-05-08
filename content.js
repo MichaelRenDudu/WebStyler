@@ -1,155 +1,140 @@
-chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-    if (request.mode) {
-        applyColorblindMode(request.mode);
-    }
-    if (request.action === "refresh") {
-        location.reload();
-    }
-});
+/* ==============================================================
+ *  content.js — auto-applies Per-Site Style Profiles
+ *  and preserves the original Daltonization features
+ * ==============================================================*/
 
-function applyColorblindMode(type) {
-    const CVDMatrix = {
-        "protanopia": [
-            0.0, 2.02344, -2.52581,
-            0.0, 1.0, 0.0,
-            0.0, 0.0, 1.0
-        ],
-        "deuteranopia": [
-            1.0, 0.0, 0.0,
-            0.494207, 0.0, 1.24827,
-            0.0, 0.0, 1.0
-        ],
-        "tritanopia": [
-            1.0, 0.0, 0.0,
-            0.0, 1.0, 0.0,
-            -0.395913, 0.801109, 0.0
-        ]
+/* ---------- 1. Auto-apply last-used profile ------------------- */
+(async () => {
+    const domain   = location.hostname;
+    const lastName = await ProfileManager.getLastUsedProfile(domain);
+    if (!lastName) return;
+  
+    const profiles = await ProfileManager.getDomainProfiles(domain);
+    const p        = profiles[lastName];
+    if (!p) return;
+  
+    injectProfileCSS(p);
+    if (p.enableSize) resizeDocumentFonts(p.size);
+  })();
+  
+  function injectProfileCSS(p) {
+    const STYLE_ID = 'ws-style-profile';
+    document.getElementById(STYLE_ID)?.remove();
+  
+    let rules = '*{';
+    if (p.enableFont)  rules += `font-family:${p.font} !important;`;
+    if (p.enableColor) rules += `color:${p.color} !important;`;
+    rules += '}';
+  
+    if (p.enableBgColor) {
+      rules += `body{background-color:${p.bgColor} !important;}`;
+    }
+  
+    const st = document.createElement('style');
+    st.id = STYLE_ID;
+    st.textContent = rules;
+    document.head.appendChild(st);
+  }
+  
+  function resizeDocumentFonts(sizeValue) {
+    function walk(el) {
+      el.style.fontSize = '';
+      Array.from(el.children).forEach(walk);
+      const fs = parseFloat(getComputedStyle(el).fontSize);
+      el.style.fontSize = (fs * (sizeValue / 50.0)) + 'px';
+    }
+    walk(document.body);
+  }
+  
+  /* ==============================================================
+   * 2. Original color-blind (Daltonization) logic — unchanged
+   * ==============================================================*/
+  
+  chrome.runtime.onMessage.addListener((req) => {
+    if (req.mode)    applyColorblindMode(req.mode);
+    if (req.action === 'refresh') location.reload();
+  });
+  
+  function applyColorblindMode(type) {
+    const CVD = {
+      protanopia:  [0,2.02344,-2.52581,   0,1,0,   0,0,1],
+      deuteranopia:[1,0,0,               0.494207,0,1.24827, 0,0,1],
+      tritanopia:  [1,0,0,               0,1,0,  -0.395913,0.801109,0]
     };
-
-    const cvd = CVDMatrix[type];
-    if (!cvd) {
-        return;
-    }
-
-    document.querySelectorAll('img').forEach((img) => {
-        if (img.complete && img.naturalWidth > 0) {
-            if (img.crossOrigin !== "anonymous" && !img.src.startsWith(window.location.origin)) {
-                handleCrossOriginImage(img, cvd);
-            } else {
-                processImage(img, cvd);
-            }
-        } else {
-            img.crossOrigin = "anonymous";
-            img.addEventListener('load', () => {
-                if (img.crossOrigin !== "anonymous" && !img.src.startsWith(window.location.origin)) {
-                    handleCrossOriginImage(img, cvd);
-                } else {
-                    processImage(img, cvd);
-                }
-            });
-            img.addEventListener('error', () => console.warn(`Failed to load image: ${img.src}`));
-        }
+    const m = CVD[type];
+    if (!m) return;
+  
+    /* ---------- images ---------- */
+    document.querySelectorAll('img').forEach(img => {
+      if (img.complete && img.naturalWidth) {
+        needsProxy(img) ? proxy(img) : daltonizeImage(img);
+      } else {
+        img.crossOrigin = 'anonymous';
+        img.addEventListener('load', () => needsProxy(img) ? proxy(img) : daltonizeImage(img));
+      }
     });
-
-    function handleCrossOriginImage(img, cvd) {
-        const proxyImage = new Image();
-        proxyImage.crossOrigin = "anonymous";
-        proxyImage.src = img.src;
-
-        proxyImage.onload = function() {
-            processImage(proxyImage, cvd, img);
-        };
-        proxyImage.onerror = function() {
-            console.warn(`Failed to load cross-origin image: ${img.src}`);
-        };
+  
+    function needsProxy(i){ return i.crossOrigin!=='anonymous' && !i.src.startsWith(location.origin); }
+    function proxy(i){
+      const p = new Image(); p.crossOrigin='anonymous'; p.src=i.src;
+      p.onload = () => daltonizeImage(p,i);
     }
-
-    function processImage(img, cvd, originalImg = img) {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = img.width;
-        canvas.height = img.height;
-
-        try {
-            ctx.drawImage(img, 0, 0);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imageData.data;
-
-            for (let i = 0; i < data.length; i += 4) {
-                let r = data[i];
-                let g = data[i + 1];
-                let b = data[i + 2];
-
-                let L = (17.8824 * r) + (43.5161 * g) + (4.11935 * b);
-                let M = (3.45565 * r) + (27.1554 * g) + (3.86714 * b);
-                let S = (0.0299566 * r) + (0.184309 * g) + (1.46709 * b);
-
-                let l = (cvd[0] * L) + (cvd[1] * M) + (cvd[2] * S);
-                let m = (cvd[3] * L) + (cvd[4] * M) + (cvd[5] * S);
-                let s = (cvd[6] * L) + (cvd[7] * M) + (cvd[8] * S);
-
-                r = (0.0809444479 * l) + (-0.130504409 * m) + (0.116721066 * s);
-                g = (-0.0102485335 * l) + (0.0540193266 * m) + (-0.113614708 * s);
-                b = (-0.000365296938 * l) + (-0.00412161469 * m) + (0.693511405 * s);
-
-                r = Math.min(Math.max(0, r), 255);
-                g = Math.min(Math.max(0, g), 255);
-                b = Math.min(Math.max(0, b), 255);
-
-                data[i] = r;
-                data[i + 1] = g;
-                data[i + 2] = b;
-            }
-
-            ctx.putImageData(imageData, 0, 0);
-            originalImg.src = canvas.toDataURL();
-            originalImg.width = canvas.width; // Ensure width is retained
-            originalImg.height = canvas.height; // Ensure height is retained
-        } catch (error) {
-            console.error(`Error processing image: ${error.message}`);
-        }
+  
+    function daltonizeImage(srcImg, target=srcImg){
+      const c = document.createElement('canvas');
+      const ctx = c.getContext('2d');
+      c.width = srcImg.width; c.height = srcImg.height;
+      ctx.drawImage(srcImg,0,0);
+      const imgData = ctx.getImageData(0,0,c.width,c.height);
+      const d = imgData.data;
+  
+      for (let k=0;k<d.length;k+=4) {
+        let [r,g,b]=[d[k],d[k+1],d[k+2]];
+        const L=17.8824*r+43.5161*g+4.11935*b;
+        const M=3.45565*r+27.1554*g+3.86714*b;
+        const S=0.0299566*r+0.184309*g+1.46709*b;
+  
+        const l=m[0]*L+m[1]*M+m[2]*S;
+        const n=m[3]*L+m[4]*M+m[5]*S;
+        const s=m[6]*L+m[7]*M+m[8]*S;
+  
+        r = 0.0809444479*l -0.130504409*n +0.116721066*s;
+        g =-0.0102485335*l +0.0540193266*n -0.113614708*s;
+        b =-0.000365296938*l-0.00412161469*n+0.693511405*s;
+  
+        d[k]   = clamp(r); d[k+1] = clamp(g); d[k+2] = clamp(b);
+      }
+      ctx.putImageData(imgData,0,0);
+      target.src = c.toDataURL();
+      target.width = c.width; target.height = c.height;
     }
-
-    function daltonizeColor(r, g, b, cvd) {
-        let L = (17.8824 * r) + (43.5161 * g) + (4.11935 * b);
-        let M = (3.45565 * r) + (27.1554 * g) + (3.86714 * b);
-        let S = (0.0299566 * r) + (0.184309 * g) + (1.46709 * b);
-
-        let l = (cvd[0] * L) + (cvd[1] * M) + (cvd[2] * S);
-        let m = (cvd[3] * L) + (cvd[4] * M) + (cvd[5] * S);
-        let s = (cvd[6] * L) + (cvd[7] * M) + (cvd[8] * S);
-
-        let newR = (0.0809444479 * l) + (-0.130504409 * m) + (0.116721066 * s);
-        let newG = (-0.0102485335 * l) + (0.0540193266 * m) + (-0.113614708 * s);
-        let newB = (-0.000365296938 * l) + (-0.00412161469 * m) + (0.693511405 * s);
-
-        newR = Math.min(Math.max(0, newR), 255);
-        newG = Math.min(Math.max(0, newG), 255);
-        newB = Math.min(Math.max(0, newB), 255);
-
-        return [newR, newG, newB];
-    }
-
-    document.querySelectorAll('*').forEach((element) => {
-        const computedStyle = window.getComputedStyle(element);
-
-        const color = computedStyle.color.match(/\d+/g)?.map(Number);
-        const backgroundColor = computedStyle.backgroundColor.match(/\d+/g)?.map(Number);
-
-        if (color && color.length === 3) {
-            const [r, g, b] = color;
-            const [newR, newG, newB] = daltonizeColor(r, g, b, cvd);
-            element.style.color = `rgb(${newR}, ${newG}, ${newB})`;
-        }
-
-        if (backgroundColor && backgroundColor.length === 3) {
-            const [r, g, b] = backgroundColor;
-            const [newR, newG, newB] = daltonizeColor(r, g, b, cvd);
-            element.style.backgroundColor = `rgb(${newR}, ${newG}, ${newB})`;
-        }
+  
+    /* ---------- text / background colours ---------- */
+    document.querySelectorAll('*').forEach(el=>{
+      const style = getComputedStyle(el);
+      const col = style.color.match(/\d+/g)?.map(Number);
+      const bg  = style.backgroundColor.match(/\d+/g)?.map(Number);
+  
+      if (col?.length===3) el.style.color = rgb(daltonizeRGB(col));
+      if (bg ?.length===3) el.style.backgroundColor = rgb(daltonizeRGB(bg));
     });
-}
-
-function resetColorblindMode() {
-    location.reload();
-}
+  
+    /* helpers */
+    function daltonizeRGB([r,g,b]){
+      const L=17.8824*r+43.5161*g+4.11935*b;
+      const M=3.45565*r+27.1554*g+3.86714*b;
+      const S=0.0299566*r+0.184309*g+1.46709*b;
+      const l=m[0]*L+m[1]*M+m[2]*S;
+      const n=m[3]*L+m[4]*M+m[5]*S;
+      const s=m[6]*L+m[7]*M+m[8]*S;
+      return [
+        clamp(0.0809444479*l -0.130504409*n +0.116721066*s),
+        clamp(-0.0102485335*l+0.0540193266*n -0.113614708*s),
+        clamp(-0.000365296938*l-0.00412161469*n+0.693511405*s)
+      ];
+    }
+    function clamp(v){ return Math.max(0, Math.min(255, v)); }
+    function rgb([r,g,b]){ return `rgb(${r},${g},${b})`; }
+  }
+  
+  function resetColorblindMode(){ location.reload(); }
