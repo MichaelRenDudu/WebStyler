@@ -11,6 +11,75 @@ async function getCurrentTabId() {
 }
 var currTabId;
 
+/* ─── Per-Site Profile Helpers ───────────────────────────────── */
+const STORAGE_KEY = 'ws_profiles';
+
+async function getProfiles() {
+  const res = await chrome.storage.sync.get(STORAGE_KEY);
+  return res[STORAGE_KEY] || {};
+}
+
+async function saveProfiles(profiles) {
+  await chrome.storage.sync.set({ [STORAGE_KEY]: profiles });
+}
+
+async function getDomainProfiles(domain) {
+  const all = await getProfiles();
+  return all[domain] || {};
+}
+
+async function saveDomainProfile(domain, name, data) {
+  const all = await getProfiles();
+  all[domain] = all[domain] || {};
+  all[domain][name] = data;
+  all[domain]._lastUsed = name;
+  await saveProfiles(all);
+}
+
+async function getLastUsedProfile(domain) {
+  const all = await getProfiles();
+  return all[domain]?._lastUsed || null;
+}
+
+async function getActiveTabDomain() {
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  return new URL(tab.url).hostname;
+}
+
+async function populateProfileDropdown() {
+  const domain = await getActiveTabDomain();
+  const select = document.getElementById('profile-select');
+  select.innerHTML = '';
+  const profs = await getDomainProfiles(domain);
+  Object.keys(profs)
+    .filter(k => k !== '_lastUsed')
+    .forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      select.appendChild(opt);
+    });
+  const last = await getLastUsedProfile(domain);
+  if (last) select.value = last;
+}
+
+async function saveCurrentAsProfile() {
+  const domain = await getActiveTabDomain();
+  const name = prompt('Enter profile name:');
+  if (!name) return;
+  const data = {
+    size: getSize(), font: getFont(),
+    color: getColor(), bgColor: getBgColor(),
+    enableSize: document.getElementById('enable-size').checked,
+    enableFont: document.getElementById('enable-font').checked,
+    enableColor: document.getElementById('enable-color').checked,
+    enableBgColor: document.getElementById('enable-bg-color').checked
+  };
+  await saveDomainProfile(domain, name, data);
+  await populateProfileDropdown();
+}
+/* ──────────────────────────────────────────────────────────────── */
+
+
 // Gets size from size slider, ranging from 1 to 100
 function getSize() {
     var sizeSlider = document.getElementById("size-slider");
@@ -269,6 +338,16 @@ function handleCheckboxChange(event) {
 document.addEventListener('DOMContentLoaded', async function () {
     currTabId = await getCurrentTabId();
     loadSavedValues();
+        // — initialize profile dropdown & auto-apply last profile —
+        await populateProfileDropdown();
+        const domain = await getActiveTabDomain();
+        const last = await getLastUsedProfile(domain);
+        if (last) {
+          const sel = document.getElementById('profile-select');
+          sel.value = last;
+          sel.dispatchEvent(new Event('change'));
+        }
+    
 
     // Existing event listeners
     var applyBtn = document.getElementById("apply-btn");
@@ -303,6 +382,61 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     document.getElementById("generalTab").addEventListener('click', function(event) { openTab(event, 'General'); });
     document.getElementById("colorblindTab").addEventListener('click', function(event) { openTab(event, 'Colorblind'); });
+        // hook the “Save Profile” button
+    document.getElementById('save-profile-btn')
+            .addEventListener('click', saveCurrentAsProfile);
+
+    // hook the profile dropdown change
+    document.getElementById('profile-select')
+            .addEventListener('change', async (e) => {
+      const domain = await getActiveTabDomain();
+      const profs  = await getDomainProfiles(domain);
+      const p      = profs[e.target.value];
+      if (!p) return;
+
+      // push settings into the form
+      document.getElementById('size-slider').value    = p.size;
+      document.getElementById('font-select').value    = p.font;
+      document.getElementById('color-wheel').value    = p.color;
+      document.getElementById('bg-color-wheel').value = p.bgColor;
+      document.getElementById('enable-size').checked      = p.enableSize;
+      document.getElementById('enable-font').checked      = p.enableFont;
+      document.getElementById('enable-color').checked     = p.enableColor;
+      document.getElementById('enable-bg-color').checked  = p.enableBgColor;
+
+      // save lastUsed and apply immediately
+      await saveDomainProfile(domain, e.target.value, p);
+      apply();
+    });
+
+
+        // hook the “Save Profile” button
+    document.getElementById('save-profile-btn')
+            .addEventListener('click', saveCurrentAsProfile);
+
+    // hook the profile dropdown change
+    document.getElementById('profile-select')
+            .addEventListener('change', async (e) => {
+      const domain = await getActiveTabDomain();
+      const profs  = await getDomainProfiles(domain);
+      const p      = profs[e.target.value];
+      if (!p) return;
+
+      // push settings into the form
+      document.getElementById('size-slider').value    = p.size;
+      document.getElementById('font-select').value    = p.font;
+      document.getElementById('color-wheel').value    = p.color;
+      document.getElementById('bg-color-wheel').value = p.bgColor;
+      document.getElementById('enable-size').checked      = p.enableSize;
+      document.getElementById('enable-font').checked      = p.enableFont;
+      document.getElementById('enable-color').checked     = p.enableColor;
+      document.getElementById('enable-bg-color').checked  = p.enableBgColor;
+
+      // save lastUsed and apply immediately
+      await saveDomainProfile(domain, e.target.value, p);
+      apply();
+    });
+
 });
 
 document.addEventListener('visibilitychange', saveValues);
