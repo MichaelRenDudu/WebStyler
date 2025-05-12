@@ -4,17 +4,20 @@
   <meta charset="utf-8" />
   <title>WebStyler</title>
   <link rel="stylesheet" href="styles.css" />
+
+  <!-- CodeMirror CSS (self-hosted or CDN) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.10/codemirror.min.css">
 </head>
 <body>
   <!-- Tab navigation -->
   <div class="tabs">
     <button id="generalTab" class="tablinks active">General</button>
     <button id="colorblindTab" class="tablinks">Colorblind</button>
+    <button id="snippetsTab" class="tablinks">Snippets</button>
   </div>
 
   <!-- General settings -->
   <div id="General" class="tabcontent" style="display: block;">
-    <!-- ── New Profile Section ───────────────────────────────────── -->
     <div class="profile-section">
       <label for="profile-select">Profile:</label>
       <select id="profile-select">
@@ -22,16 +25,13 @@
       </select>
       <button id="save-profile-btn">Save Profile</button>
     </div>
-    <!-- ──────────────────────────────────────────────────────────── -->
 
-    <!-- Text size control -->
     <div class="control">
       <input type="checkbox" id="enable-size" />
       <label for="size-slider">Text Size</label>
       <input type="range" id="size-slider" min="1" max="100" value="50" />
     </div>
 
-    <!-- Font family control -->
     <div class="control">
       <input type="checkbox" id="enable-font" />
       <label for="font-select">Font</label>
@@ -43,21 +43,18 @@
       </select>
     </div>
 
-    <!-- Text color control -->
     <div class="control">
       <input type="checkbox" id="enable-color" />
       <label for="color-wheel">Text Color</label>
       <input type="color" id="color-wheel" value="#000000" />
     </div>
 
-    <!-- Background color control -->
     <div class="control">
       <input type="checkbox" id="enable-bg-color" />
       <label for="bg-color-wheel">Background Color</label>
       <input type="color" id="bg-color-wheel" value="#ffffff" />
     </div>
 
-    <!-- Apply / Reset -->
     <button id="apply-btn">Apply</button>
     <button id="reset-btn">Reset</button>
   </div>
@@ -79,10 +76,31 @@
     <button id="colorblind-apply-btn">Apply</button>
     <button id="colorblind-reset-btn">Reset</button>
   </div>
+
+  <!-- Snippets settings -->
+  <div id="Snippets" class="tabcontent">
+    <div class="control">
+      <label for="favorite-snippets">Favorites:</label>
+      <select id="favorite-snippets">
+        <option value="" disabled selected>Select a saved snippet</option>
+      </select>
+      <button id="delete-snippet-btn">Delete</button>
+    </div>
+
+    <textarea id="snippet-editor">// Write custom CSS here</textarea>
+
+    <div class="control">
+      <button id="run-snippet-btn">Run</button>
+      <button id="save-snippet-btn">Save as Favorite</button>
+    </div>
+  </div>
+
+  <!-- Scripts (in proper order) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.10/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.10/mode/css/css.min.js"></script>
+
   <script src="profileManager.js"></script>
-  <script src="popup.js"></script>
-
-
+  <script src="snippetManager.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
