@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "WebStyler",
   "description": "Chrome web-styler designed to make pages more readable",
-  "version": "1.0",
+  "version": "1.1",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -20,7 +20,6 @@
   "permissions": [
     "activeTab",
     "scripting",
-    "declarativeNetRequest",
     "storage",
     "downloads"
   ],
@@ -39,7 +38,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["profileManager.js", "content.js"],
+      "js": ["profileManager.js", "snippetManager.js", "content.js"],
       "run_at": "document_idle"
     }
   ]
