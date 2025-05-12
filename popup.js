@@ -1,3 +1,19 @@
+let snippetEditor;  // Will hold the CodeMirror instance
+function initSnippetEditor() {
+    if (!snippetEditor) {
+      snippetEditor = CodeMirror.fromTextArea(
+        document.getElementById('snippet-editor'),
+        {
+          mode: 'css',
+          lineNumbers: true,
+          lineWrapping: true
+        }
+      );
+    }
+  }
+  
+
+
 // getCurrentTabId() retrieves the ID of the currently active tab
 // in the last focused window,
 // which is necessary for sending messages to the correct tab.
@@ -159,6 +175,20 @@ async function loadSavedValues() {
     document.getElementById("enable-color").checked = currColorCheck;
     document.getElementById("enable-bg-color").checked = currBgColorCheck;
 }
+
+async function loadSnippetFavorites() {
+    const domain = await getActiveTabDomain();
+    const all = await SnippetManager.getAll(domain);
+    const dropdown = document.getElementById("favorite-snippets");
+    dropdown.innerHTML = '<option disabled selected>Select a saved snippet</option>';
+    for (const name in all) {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      dropdown.appendChild(opt);
+    }
+  }
+  
 
 async function updateValues() {
     // Updates values of currSize, currColor, currBgColor, currFont to be saved later
@@ -322,6 +352,11 @@ function openTab(evt, tabName) {
     }
     document.getElementById(tabName).style.display = "block";
     evt.currentTarget.className += " active";
+
+    if (tabName === "Snippets") {
+        initSnippetEditor();
+        loadSnippetFavorites();
+    }
 }
 
 function handleCheckboxChange(event) {
@@ -334,30 +369,41 @@ function handleCheckboxChange(event) {
 }
 
 // When DOM is loaded, adds event listeners to buttons
-// Apply saved colorblind mode on page load
 document.addEventListener('DOMContentLoaded', async function () {
     currTabId = await getCurrentTabId();
     loadSavedValues();
-        // — initialize profile dropdown & auto-apply last profile —
-        await populateProfileDropdown();
-        const domain = await getActiveTabDomain();
-        const last = await getLastUsedProfile(domain);
-        if (last) {
-          const sel = document.getElementById('profile-select');
-          sel.value = last;
-          sel.dispatchEvent(new Event('change'));
-        }
-    
 
-    // Existing event listeners
-    var applyBtn = document.getElementById("apply-btn");
-    applyBtn.addEventListener('click', apply);
+    // — initialize profile dropdown & auto-apply last profile —
+    await populateProfileDropdown();
+    const domain = await getActiveTabDomain();
+    const last = await getLastUsedProfile(domain);
+    if (last) {
+        const sel = document.getElementById('profile-select');
+        sel.value = last;
+        sel.dispatchEvent(new Event('change'));
+    }
 
-    var resetBtn = document.getElementById("reset-btn");
-    resetBtn.addEventListener('click', reset);
+    // Existing tab buttons
+    document.getElementById("generalTab").addEventListener('click', function(event) {
+        openTab(event, 'General');
+    });
+    document.getElementById("colorblindTab").addEventListener('click', function(event) {
+        openTab(event, 'Colorblind');
+    });
 
-    var colorblindApplyBtn = document.getElementById("colorblind-apply-btn");
-    colorblindApplyBtn.addEventListener('click', function () {
+    // ✅ New: snippets tab click
+    document.getElementById("snippetsTab").addEventListener("click", function (event) {
+        openTab(event, 'Snippets');
+        initSnippetEditor();
+        loadSnippetFavorites();
+    });
+
+    // Main style apply/reset
+    document.getElementById("apply-btn").addEventListener('click', apply);
+    document.getElementById("reset-btn").addEventListener('click', reset);
+
+    // Colorblind mode apply/reset
+    document.getElementById("colorblind-apply-btn").addEventListener('click', function () {
         if (document.getElementById("protanopia").checked) {
             applyColorblindMode("protanopia");
         } else if (document.getElementById("deuteranopia").checked) {
@@ -367,8 +413,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
     });
 
-    var colorblindResetBtn = document.getElementById("colorblind-reset-btn");
-    colorblindResetBtn.addEventListener('click', async function () {
+    document.getElementById("colorblind-reset-btn").addEventListener('click', function () {
         resetColorblindMode();
         document.getElementById("protanopia").checked = false;
         document.getElementById("deuteranopia").checked = false;
@@ -376,70 +421,72 @@ document.addEventListener('DOMContentLoaded', async function () {
         localStorage.removeItem("colorblindMode");
     });
 
+    // Colorblind checkbox handlers
     document.getElementById("protanopia").addEventListener('change', handleCheckboxChange);
     document.getElementById("deuteranopia").addEventListener('change', handleCheckboxChange);
     document.getElementById("tritanopia").addEventListener('change', handleCheckboxChange);
 
-    document.getElementById("generalTab").addEventListener('click', function(event) { openTab(event, 'General'); });
-    document.getElementById("colorblindTab").addEventListener('click', function(event) { openTab(event, 'Colorblind'); });
-        // hook the “Save Profile” button
-    document.getElementById('save-profile-btn')
-            .addEventListener('click', saveCurrentAsProfile);
+    // Profile Save
+    document.getElementById("save-profile-btn").addEventListener('click', saveCurrentAsProfile);
 
-    // hook the profile dropdown change
-    document.getElementById('profile-select')
-            .addEventListener('change', async (e) => {
-      const domain = await getActiveTabDomain();
-      const profs  = await getDomainProfiles(domain);
-      const p      = profs[e.target.value];
-      if (!p) return;
+    // Profile dropdown change
+    document.getElementById("profile-select").addEventListener('change', async (e) => {
+        const domain = await getActiveTabDomain();
+        const profs = await getDomainProfiles(domain);
+        const p = profs[e.target.value];
+        if (!p) return;
 
-      // push settings into the form
-      document.getElementById('size-slider').value    = p.size;
-      document.getElementById('font-select').value    = p.font;
-      document.getElementById('color-wheel').value    = p.color;
-      document.getElementById('bg-color-wheel').value = p.bgColor;
-      document.getElementById('enable-size').checked      = p.enableSize;
-      document.getElementById('enable-font').checked      = p.enableFont;
-      document.getElementById('enable-color').checked     = p.enableColor;
-      document.getElementById('enable-bg-color').checked  = p.enableBgColor;
+        document.getElementById("size-slider").value = p.size;
+        document.getElementById("font-select").value = p.font;
+        document.getElementById("color-wheel").value = p.color;
+        document.getElementById("bg-color-wheel").value = p.bgColor;
+        document.getElementById("enable-size").checked = p.enableSize;
+        document.getElementById("enable-font").checked = p.enableFont;
+        document.getElementById("enable-color").checked = p.enableColor;
+        document.getElementById("enable-bg-color").checked = p.enableBgColor;
 
-      // save lastUsed and apply immediately
-      await saveDomainProfile(domain, e.target.value, p);
-      apply();
+        await saveDomainProfile(domain, e.target.value, p);
+        apply();
     });
 
-
-        // hook the “Save Profile” button
-    document.getElementById('save-profile-btn')
-            .addEventListener('click', saveCurrentAsProfile);
-
-    // hook the profile dropdown change
-    document.getElementById('profile-select')
-            .addEventListener('change', async (e) => {
-      const domain = await getActiveTabDomain();
-      const profs  = await getDomainProfiles(domain);
-      const p      = profs[e.target.value];
-      if (!p) return;
-
-      // push settings into the form
-      document.getElementById('size-slider').value    = p.size;
-      document.getElementById('font-select').value    = p.font;
-      document.getElementById('color-wheel').value    = p.color;
-      document.getElementById('bg-color-wheel').value = p.bgColor;
-      document.getElementById('enable-size').checked      = p.enableSize;
-      document.getElementById('enable-font').checked      = p.enableFont;
-      document.getElementById('enable-color').checked     = p.enableColor;
-      document.getElementById('enable-bg-color').checked  = p.enableBgColor;
-
-      // save lastUsed and apply immediately
-      await saveDomainProfile(domain, e.target.value, p);
-      apply();
+    // ✅ New: Snippet - Run button
+    document.getElementById("run-snippet-btn").addEventListener("click", async () => {
+        const css = snippetEditor.getValue();
+        const tabId = await getCurrentTabId();
+        chrome.tabs.sendMessage(tabId, { action: "applySnippet", css });
     });
 
+    // ✅ New: Snippet - Save button
+    document.getElementById("save-snippet-btn").addEventListener("click", async () => {
+        const name = prompt("Enter snippet name:");
+        if (!name) return;
+        const css = snippetEditor.getValue();
+        const domain = await getActiveTabDomain();
+        await SnippetManager.save(domain, name, css);
+        loadSnippetFavorites();
+    });
+
+    // ✅ New: Snippet - Delete button
+    document.getElementById("delete-snippet-btn").addEventListener("click", async () => {
+        const dropdown = document.getElementById("favorite-snippets");
+        const name = dropdown.value;
+        if (!name) return;
+        const domain = await getActiveTabDomain();
+        await SnippetManager.delete(domain, name);
+        loadSnippetFavorites();
+    });
+
+    // ✅ New: Snippet - Select from favorites
+    document.getElementById("favorite-snippets").addEventListener("change", async (e) => {
+        const name = e.target.value;
+        const domain = await getActiveTabDomain();
+        const all = await SnippetManager.getAll(domain);
+        snippetEditor.setValue(all[name]);
+    });
 });
 
 document.addEventListener('visibilitychange', saveValues);
+
 
 // https://stackoverflow.com/questions/77495555/how-do-i-execute-a-script-on-the-current-tab-using-chrome-scripting-api:
 // https://stackoverflow.com/questions/11684454/getting-the-source-html-of-the-current-page-from-chrome-extension/11696154#11696154
